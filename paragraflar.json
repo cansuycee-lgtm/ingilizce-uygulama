@@ -1,0 +1,28 @@
+[
+  {
+    "id": 1,
+    "paragraph": "The climate crisis is one of the biggest challenges of our century. Governments are working together to reduce carbon emissions.",
+    "sentences": [
+      {
+        "text": "The climate crisis is one of the biggest challenges of our century.",
+        "answer": "İklim krizi yüzyılımızın en büyük zorluklarından biridir.",
+        "choices": [
+          "İklim krizi yüzyılımızın en büyük zorluklarından biridir.",
+          "İklim krizi çözülmüş eski bir problemdir.",
+          "İklim krizi yalnızca gelişmekte olan ülkeleri ilgilendirir.",
+          "İklim krizi bireysel bir sorun olarak görülmektedir."
+        ]
+      },
+      {
+        "text": "Governments are working together to reduce carbon emissions.",
+        "answer": "Hükümetler karbon emisyonlarını azaltmak için birlikte çalışıyor.",
+        "choices": [
+          "Hükümetler karbon emisyonlarını azaltmak için birlikte çalışıyor.",
+          "Hükümetler karbon emisyonlarını artırmak için plan yapıyor.",
+          "Hükümetler çevre sorunlarıyla ilgilenmiyor.",
+          "Hükümetler sadece ekonomik büyümeye odaklanıyor."
+        ]
+      }
+    ]
+  }
+]

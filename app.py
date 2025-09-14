@@ -47,7 +47,7 @@ def puan_guncelle(dogru_mu: bool):
 # Sidebar Menü
 # -------------------------------
 st.sidebar.title("📑 Menü")
-sayfa = st.sidebar.radio("Git:", ["🏠 Ana Sayfa", "📝 Testler", "📊 İstatistikler"])
+sayfa = st.sidebar.radio("Git:", ["🏠 Ana Sayfa", "📝 Testler", "📊 İstatistikler", "📂 Paragraf Yükle"])
 
 # -------------------------------
 # Ana Sayfa
@@ -62,7 +62,7 @@ if sayfa == "🏠 Ana Sayfa":
     st.write(f"✅ Doğru: {puan['dogru']}")
     st.write(f"❌ Yanlış: {puan['yanlis']}")
 
-    st.info("Menüden testlere başlayabilir veya istatistikleri görebilirsin.")
+    st.info("Menüden testlere başlayabilir, paragraf yükleyebilir veya istatistikleri görebilirsin.")
 
 # -------------------------------
 # Testler
@@ -71,7 +71,7 @@ elif sayfa == "📝 Testler":
     test_turu = st.radio("Test Türünü Seç:", ["İngilizceden Türkçeye", "Türkçeden İngilizceye"])
 
     if not paragraflar:
-        st.warning("Henüz paragraf eklenmemiş. Lütfen paragraflar.json dosyasına içerik ekle.")
+        st.warning("Henüz paragraf eklenmemiş. Lütfen 'Paragraf Yükle' bölümünden dosya ekleyin.")
     else:
         secili_paragraf = random.choice(paragraflar)
         secili_cumle = random.choice(secili_paragraf["sentences"])
@@ -84,15 +84,13 @@ elif sayfa == "📝 Testler":
 
         else:  # Türkçeden İngilizceye
             st.write(secili_cumle["answer"])
-            # İngilizce şıklar üretelim (1 doğru + diğer yanlışlar)
             secenekler = [secili_cumle["text"]]
-            # Yanlış şıklar için cümlenin içine karışık ekleme
             secenekler += [
                 secili_cumle["text"].replace("is", "was"),
                 secili_cumle["text"].replace("are", "were"),
                 secili_cumle["text"].replace("the", "a")
             ]
-            secenekler = list(set(secenekler))  # tekrarları sil
+            secenekler = list(set(secenekler))
             dogru_cevap = secili_cumle["text"]
 
         random.shuffle(secenekler)
@@ -119,3 +117,21 @@ elif sayfa == "📊 İstatistikler":
     st.subheader("📅 Günlük İstatistikler")
     for tarih, deger in puan["gunluk"].items():
         st.write(f"📌 {tarih} → ✅ {deger['dogru']} | ❌ {deger['yanlis']}")
+
+# -------------------------------
+# Paragraf Yükleme
+# -------------------------------
+elif sayfa == "📂 Paragraf Yükle":
+    st.title("📂 Yeni Paragraf Dosyası Yükle")
+
+    uploaded_file = st.file_uploader("JSON dosyası seç (paragraflar.json)", type=["json"])
+
+    if uploaded_file is not None:
+        try:
+            yeni_veri = json.load(uploaded_file)
+            with open(DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(yeni_veri, f, ensure_ascii=False, indent=2)
+
+            st.success("✅ Paragraf dosyası başarıyla yüklendi ve güncellendi!")
+        except Exception as e:
+            st.error(f"❌ Hata: {e}")

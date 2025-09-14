@@ -73,8 +73,12 @@ elif sayfa == "📝 Testler":
     if not paragraflar:
         st.warning("Henüz paragraf eklenmemiş. Lütfen 'Paragraf Yükle' bölümünden dosya ekleyin.")
     else:
-        secili_paragraf = random.choice(paragraflar)
-        secili_cumle = random.choice(secili_paragraf["sentences"])
+        # Session state içinde soru saklama
+        if "secili_cumle" not in st.session_state or st.button("🔄 Yeni Soruya Geç"):
+            secili_paragraf = random.choice(paragraflar)
+            st.session_state.secili_cumle = random.choice(secili_paragraf["sentences"])
+
+        secili_cumle = st.session_state.secili_cumle
 
         st.subheader("Soru")
         if test_turu == "İngilizceden Türkçeye":
@@ -94,15 +98,18 @@ elif sayfa == "📝 Testler":
             dogru_cevap = secili_cumle["text"]
 
         random.shuffle(secenekler)
-        cevap = st.radio("Doğru cevabı seç:", secenekler)
+        cevap = st.radio("Doğru cevabı seç:", secenekler, key=f"soru_{random.randint(0,99999)}")
 
         if st.button("✅ Cevabı Kontrol Et"):
             if cevap == dogru_cevap:
-                st.success("Doğru!")
+                st.success("✅ Doğru!")
                 puan_guncelle(True)
             else:
-                st.error(f"Yanlış! Doğru cevap: {dogru_cevap}")
+                st.error(f"❌ Yanlış! Doğru cevap: {dogru_cevap}")
                 puan_guncelle(False)
+
+            st.info("Yeni soruya geçmek için aşağıdaki butona tıkla.")
+            st.button("🔄 Yeni Soruya Geç")
 
 # -------------------------------
 # İstatistikler

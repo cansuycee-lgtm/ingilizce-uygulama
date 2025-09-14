@@ -11,9 +11,144 @@ DATA_FILE = "paragraflar.json"
 SCORE_FILE = "puan_paragraf.json"
 BACKUP_DATA_FILE = "paragraflar_backup.json"
 BACKUP_SCORE_FILE = "puan_paragraf_backup.json"
+WORDS_FILE = "kelimeler.json"  # Kelimeler dosyası
+
+# -------------------- Varsayılan Kelimeler --------------------
+DEFAULT_WORDS = [
+    "communication", "technology", "environment", "education", "health",
+    "development", "research", "society", "economy", "culture",
+    "innovation", "sustainable", "effective", "significant", "essential",
+    "analyze", "improve", "create", "discover", "implement",
+    "challenge", "opportunity", "solution", "benefit", "impact",
+    "global", "modern", "traditional", "digital", "natural",
+    "popular", "successful", "important", "necessary", "possible"
+]
 
 
 # -------------------- Yardımcı Fonksiyonlar --------------------
+
+def load_words():
+    """Kelimeler dosyasını yükle"""
+    try:
+        if os.path.exists(WORDS_FILE):
+            with open(WORDS_FILE, "r", encoding="utf-8") as f:
+                words = json.load(f)
+                return words if isinstance(words, list) and words else DEFAULT_WORDS
+        else:
+            # Varsayılan kelimeleri kaydet
+            with open(WORDS_FILE, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_WORDS, f, ensure_ascii=False, indent=2)
+            return DEFAULT_WORDS
+    except Exception as e:
+        st.error(f"Kelimeler yüklenirken hata: {e}")
+        return DEFAULT_WORDS
+
+
+def save_words(words):
+    """Kelimeleri kaydet"""
+    try:
+        with open(WORDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(words, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Kelimeler kaydedilirken hata: {e}")
+        return False
+
+
+def generate_sentence_question(words, question_type):
+    """Kelimelerden cümle soruları üret"""
+    if not words or len(words) < 3:
+        return None, None, None, None
+
+    # Rastgele 2-3 kelime seç
+    selected_words = random.sample(words, min(random.randint(2, 3), len(words)))
+
+    # Basit cümle şablonları
+    sentence_templates = {
+        "en_to_tr": [
+            f"Modern {selected_words[0]} helps people communicate better.",
+            f"The {selected_words[0]} of {selected_words[1] if len(selected_words) > 1 else 'society'} is very important.",
+            f"We need to {selected_words[0]} our {selected_words[1] if len(selected_words) > 1 else 'skills'}.",
+            f"This {selected_words[0]} creates new opportunities.",
+            f"Effective {selected_words[0]} requires good planning."
+        ],
+        "tr_to_en": [
+            f"Modern {selected_words[0]} insanların daha iyi iletişim kurmasına yardımcı olur.",
+            f"{selected_words[1] if len(selected_words) > 1 else 'Toplumun'} {selected_words[0]}'si çok önemlidir.",
+            f"{selected_words[1] if len(selected_words) > 1 else 'Becerilerimizi'} {selected_words[0]} etmemiz gerekiyor.",
+            f"Bu {selected_words[0]} yeni fırsatlar yaratır.",
+            f"Etkili {selected_words[0]} iyi planlama gerektirir."
+        ],
+        "fill_blank": [
+            f"Modern _____ helps people communicate better.",
+            f"The importance of _____ is very significant.",
+            f"We need to _____ our knowledge and skills.",
+            f"This new _____ creates many opportunities.",
+            f"Effective communication requires good _____."
+        ]
+    }
+
+    try:
+        if question_type == "en_to_tr":
+            question = random.choice(sentence_templates["en_to_tr"])
+            correct_answer = question  # Türkçe çeviri olacak (basitleştirilmiş)
+
+            # Basit çeviri örnekleri
+            translations = {
+                "Modern communication helps people communicate better.": "Modern iletişim insanların daha iyi iletişim kurmasına yardımcı olur.",
+                "Modern technology helps people communicate better.": "Modern teknoloji insanların daha iyi iletişim kurmasına yardımcı olur.",
+                "Modern education helps people communicate better.": "Modern eğitim insanların daha iyi iletişim kurmasına yardımcı olur."
+            }
+
+            # Genel çeviri şablonu
+            if "helps people communicate better" in question:
+                word = question.split()[1]  # Modern'dan sonraki kelime
+                correct_answer = f"Modern {word} insanların daha iyi iletişim kurmasına yardımcı olur."
+
+            options = [
+                correct_answer,
+                f"Eski {selected_words[0]} insanları ayırır.",
+                f"Basit {selected_words[0]} kimseye yardım etmez.",
+                f"Karmaşık {selected_words[0]} sorun yaratır."
+            ]
+
+        elif question_type == "tr_to_en":
+            question = f"Modern {selected_words[0]} insanların daha iyi iletişim kurmasına yardımcı olur."
+            correct_answer = f"Modern {selected_words[0]} helps people communicate better."
+            options = [
+                correct_answer,
+                f"Old {selected_words[0]} separates people.",
+                f"Simple {selected_words[0]} helps nobody.",
+                f"Complex {selected_words[0]} creates problems."
+            ]
+
+        elif question_type == "fill_blank":
+            templates = [
+                ("Modern _____ helps people communicate better.", selected_words[0]),
+                ("The importance of _____ is very significant.", selected_words[0]),
+                ("We need to _____ our knowledge and skills.", "improve"),
+                ("This new _____ creates many opportunities.", selected_words[0]),
+                ("Effective communication requires good _____.", "planning")
+            ]
+
+            template, answer = random.choice(templates)
+            question = template
+            correct_answer = answer
+
+            # Yanlış seçenekler üret
+            wrong_options = [w for w in selected_words if w != answer]
+            if len(wrong_options) < 3:
+                wrong_options.extend(["solution", "method", "system", "process", "result"])
+
+            options = [correct_answer] + random.sample(wrong_options, 3)
+
+        random.shuffle(options)
+        return question, question, correct_answer, options
+
+    except Exception as e:
+        st.error(f"Cümle sorusu üretirken hata: {e}")
+        return None, None, None, None
+
 
 def create_backup():
     """Veri dosyalarının backup'ını oluştur"""
@@ -101,7 +236,8 @@ def initialize_default_data():
                 }
             ],
             "added_date": "2025-01-15",
-            "difficulty": "intermediate"
+            "difficulty": "intermediate",
+            "used_questions": []  # Kullanılan soruları takip et
         }
     ]
 
@@ -115,7 +251,8 @@ def initialize_default_data():
                 "wrong": 0,
                 "en_to_tr_answered": 0,
                 "tr_to_en_answered": 0,
-                "fill_blank_answered": 0
+                "fill_blank_answered": 0,
+                "sentence_test_answered": 0  # Yeni: cümle testi sayacı
             }
         },
         "last_check_date": "2025-01-15",
@@ -124,7 +261,8 @@ def initialize_default_data():
         "wrong_streak": 0,
         "en_to_tr_answered": 0,
         "tr_to_en_answered": 0,
-        "fill_blank_answered": 0
+        "fill_blank_answered": 0,
+        "sentence_test_answered": 0  # Yeni: cümle testi sayacı
     }
 
     return default_paragraflar, default_score_data
@@ -142,7 +280,8 @@ def safe_load_data():
         "wrong_streak": 0,
         "en_to_tr_answered": 0,
         "tr_to_en_answered": 0,
-        "fill_blank_answered": 0
+        "fill_blank_answered": 0,
+        "sentence_test_answered": 0  # Yeni sayaç
     }
 
     # Ana dosyaları yüklemeyi dene
@@ -153,6 +292,11 @@ def safe_load_data():
                 if not paragraflar:  # Boş dosya kontrolü
                     st.warning("⚠️ Paragraflar dosyası boş, varsayılan veriler yükleniyor...")
                     paragraflar, _ = initialize_default_data()
+
+                # Eski verilere used_questions ekle
+                for paragraf in paragraflar:
+                    if "used_questions" not in paragraf:
+                        paragraf["used_questions"] = []
         else:
             st.info("📝 İlk kez açılıyor, varsayılan veriler yükleniyor...")
             paragraflar, _ = initialize_default_data()
@@ -163,6 +307,15 @@ def safe_load_data():
                 for key in score_data.keys():
                     if key in loaded_score:
                         score_data[key] = loaded_score[key]
+
+                # Eski verilere yeni sayaçları ekle
+                if "sentence_test_answered" not in score_data:
+                    score_data["sentence_test_answered"] = 0
+
+                # Günlük verilere de yeni sayaç ekle
+                for daily_data in score_data.get("daily", {}).values():
+                    if "sentence_test_answered" not in daily_data:
+                        daily_data["sentence_test_answered"] = 0
         else:
             _, score_data = initialize_default_data()
 
@@ -201,8 +354,8 @@ def safe_load_data():
     return paragraflar, score_data
 
 
-def generate_question(test_type, paragraf):
-    """Test türüne göre soru üret"""
+def generate_paragraph_question(test_type, paragraf):
+    """Paragraf testleri için soru üret (aynı paragraftan birden fazla soru)"""
     if not paragraf.get("questions"):
         return None, None, None, None
 
@@ -212,18 +365,39 @@ def generate_question(test_type, paragraf):
     if not suitable_questions:
         return None, None, None, None
 
-    selected_question = random.choice(suitable_questions)
+    # Kullanılmamış soruları bul
+    used_questions = paragraf.get("used_questions", [])
+    unused_questions = []
+
+    for i, question in enumerate(suitable_questions):
+        question_key = f"{test_type}_{i}"
+        if question_key not in used_questions:
+            unused_questions.append((i, question, question_key))
+
+    # Eğer tüm sorular kullanıldıysa, sıfırla
+    if not unused_questions:
+        # Bu test türü için kullanılan soruları sıfırla
+        paragraf["used_questions"] = [q for q in used_questions if not q.startswith(f"{test_type}_")]
+        unused_questions = [(i, question, f"{test_type}_{i}") for i, question in enumerate(suitable_questions)]
+
+    if not unused_questions:
+        return None, None, None, None
+
+    # Rastgele kullanılmamış soru seç
+    question_index, selected_question, question_key = random.choice(unused_questions)
 
     question_text = selected_question["question"]
     correct_answer = selected_question["correct_answer"]
     options = selected_question["options"].copy()
     random.shuffle(options)
 
-    return selected_question, question_text, correct_answer, options
+    return selected_question, question_text, correct_answer, options, question_key
 
 
 # -------------------- Ana Veriler --------------------
 paragraflar, score_data = safe_load_data()
+words = load_words()  # Kelimeleri yükle
+
 current_time = datetime.now()
 today = current_time.date()
 today_str = today.strftime("%Y-%m-%d")
@@ -241,6 +415,7 @@ if score_data.get("last_check_date") != today_str:
     score_data["en_to_tr_answered"] = 0
     score_data["tr_to_en_answered"] = 0
     score_data["fill_blank_answered"] = 0
+    score_data["sentence_test_answered"] = 0
 
 if today_str not in score_data["daily"]:
     score_data["daily"][today_str] = {
@@ -250,7 +425,8 @@ if today_str not in score_data["daily"]:
         "wrong": 0,
         "en_to_tr_answered": 0,
         "tr_to_en_answered": 0,
-        "fill_blank_answered": 0
+        "fill_blank_answered": 0,
+        "sentence_test_answered": 0
     }
 
 safe_save_data()
@@ -258,7 +434,7 @@ safe_save_data()
 # -------------------- Streamlit Arayüz --------------------
 
 st.set_page_config(page_title="YDS Paragraf Test", page_icon="📄", layout="wide")
-st.title("📄 YDS Paragraf Test Uygulaması v1.0")
+st.title("📄 YDS Paragraf Test Uygulaması v2.0")
 
 # Sidebar bilgileri
 with st.sidebar:
@@ -271,16 +447,19 @@ with st.sidebar:
     bugun_soru = score_data["questions_answered_today"]
     st.write(f"❓ **Bugün çözülen:** {bugun_soru} soru")
     st.write(f"📄 **Toplam paragraf:** {len(paragraflar)}")
+    st.write(f"📝 **Kelime sayısı:** {len(words)}")
 
     # Test türü ilerlemeleri
     st.markdown("### 🎯 Test İlerlemeleri")
     en_tr_current = score_data.get("en_to_tr_answered", 0)
     tr_en_current = score_data.get("tr_to_en_answered", 0)
     fill_blank_current = score_data.get("fill_blank_answered", 0)
+    sentence_current = score_data.get("sentence_test_answered", 0)
 
     st.write(f"🇺🇸➡️🇹🇷 **EN→TR:** {en_tr_current}")
     st.write(f"🇹🇷➡️🇺🇸 **TR→EN:** {tr_en_current}")
     st.write(f"📝 **Boşluk Doldurma:** {fill_blank_current}")
+    st.write(f"✏️ **Cümle Testi:** {sentence_current}")
 
     # Seri durumu
     if score_data.get("correct_streak", 0) > 0:
@@ -292,7 +471,7 @@ with st.sidebar:
 # Ana menü
 menu = st.sidebar.radio(
     "📋 Menü",
-    ["🏠 Ana Sayfa", "📝 Testler", "📊 İstatistikler", "➕ Paragraf Ekle", "🔧 Ayarlar"],
+    ["🏠 Ana Sayfa", "📝 Paragraf Testleri", "✏️ Cümle Testleri", "📊 İstatistikler", "➕ Paragraf Ekle", "🔧 Ayarlar"],
     key="main_menu"
 )
 
@@ -325,85 +504,94 @@ if menu == "🏠 Ana Sayfa":
 
     st.subheader("📊 Test Türleri Özeti")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
         st.info(f"""
-        **🇺🇸➡️🇹🇷 İngilizce → Türkçe**
-        Çözülen: {en_tr_current}
+        **📄 Paragraf Testleri**
+        • 🇺🇸➡️🇹🇷 EN→TR: {en_tr_current}
+        • 🇹🇷➡️🇺🇸 TR→EN: {tr_en_current}
+        • 📝 Boşluk: {fill_blank_current}
         """)
 
     with col2:
         st.info(f"""
-        **🇹🇷➡️🇺🇸 Türkçe → İngilizce**
-        Çözülen: {tr_en_current}
+        **✏️ Cümle Testleri**
+        • Toplam Çözülen: {sentence_current}
+        • Kelime Sayısı: {len(words)}
         """)
 
-    with col3:
-        st.info(f"""
-        **📝 Boşluk Doldurma**
-        Çözülen: {fill_blank_current}
-        """)
+# -------------------- Paragraf Testleri --------------------
 
-# -------------------- Testler --------------------
-
-elif menu == "📝 Testler":
-    st.header("📝 Testler")
+elif menu == "📝 Paragraf Testleri":
+    st.header("📝 Paragraf Testleri")
 
     if len(paragraflar) == 0:
         st.warning("⚠️ Test çözebilmek için en az 1 paragraf olmalı!")
         st.stop()
 
     # Test türü seçimi
-    if "selected_test_type" not in st.session_state:
-        st.session_state.selected_test_type = None
+    if "selected_paragraph_test_type" not in st.session_state:
+        st.session_state.selected_paragraph_test_type = None
 
     # Test türü butonları
     col1, col2, col3 = st.columns(3)
 
     with col1:
         if st.button("🇺🇸➡️🇹🇷 İngilizce → Türkçe", use_container_width=True,
-                     type="primary" if st.session_state.selected_test_type == "en_to_tr" else "secondary"):
-            st.session_state.selected_test_type = "en_to_tr"
-            st.session_state.current_question = None
+                     type="primary" if st.session_state.selected_paragraph_test_type == "en_to_tr" else "secondary"):
+            st.session_state.selected_paragraph_test_type = "en_to_tr"
+            st.session_state.current_paragraph_question = None
 
     with col2:
         if st.button("🇹🇷➡️🇺🇸 Türkçe → İngilizce", use_container_width=True,
-                     type="primary" if st.session_state.selected_test_type == "tr_to_en" else "secondary"):
-            st.session_state.selected_test_type = "tr_to_en"
-            st.session_state.current_question = None
+                     type="primary" if st.session_state.selected_paragraph_test_type == "tr_to_en" else "secondary"):
+            st.session_state.selected_paragraph_test_type = "tr_to_en"
+            st.session_state.current_paragraph_question = None
 
     with col3:
         if st.button("📝 Boşluk Doldurma", use_container_width=True,
-                     type="primary" if st.session_state.selected_test_type == "fill_blank" else "secondary"):
-            st.session_state.selected_test_type = "fill_blank"
-            st.session_state.current_question = None
+                     type="primary" if st.session_state.selected_paragraph_test_type == "fill_blank" else "secondary"):
+            st.session_state.selected_paragraph_test_type = "fill_blank"
+            st.session_state.current_paragraph_question = None
 
     # Test seçilmişse soruyu göster
-    if st.session_state.selected_test_type:
+    if st.session_state.selected_paragraph_test_type:
         st.divider()
 
         # Mevcut soruyu kontrol et, yoksa yeni soru üret
-        if "current_question" not in st.session_state or st.session_state.current_question is None:
-            selected_paragraph = random.choice(paragraflar)
-            result = generate_question(st.session_state.selected_test_type, selected_paragraph)
+        if "current_paragraph_question" not in st.session_state or st.session_state.current_paragraph_question is None:
+            # Eğer aktif paragraf varsa ondan soru bul, yoksa yeni paragraf seç
+            if "active_paragraph" not in st.session_state or st.session_state.active_paragraph is None:
+                st.session_state.active_paragraph = random.choice(paragraflar)
 
-            if result[0] is None:  # Bu türde soru yoksa
-                st.warning(f"Bu paragraf için {st.session_state.selected_test_type} türünde soru bulunamadı!")
-                st.session_state.selected_test_type = None
-                st.stop()
+            result = generate_paragraph_question(st.session_state.selected_paragraph_test_type,
+                                                 st.session_state.active_paragraph)
 
-            st.session_state.current_question = {
-                "paragraph": selected_paragraph,
+            if result is None or result[0] is None:  # Bu türde soru yoksa
+                st.warning(
+                    f"Bu paragraf için {st.session_state.selected_paragraph_test_type} türünde soru kalmadı! Yeni paragraf seçiliyor...")
+                st.session_state.active_paragraph = random.choice(paragraflar)
+                result = generate_paragraph_question(st.session_state.selected_paragraph_test_type,
+                                                     st.session_state.active_paragraph)
+
+                if result is None or result[0] is None:
+                    st.error("Hiçbir paragrafta bu türde soru bulunamadı!")
+                    st.session_state.selected_paragraph_test_type = None
+                    st.stop()
+
+            st.session_state.current_paragraph_question = {
+                "paragraph": st.session_state.active_paragraph,
                 "question_obj": result[0],
                 "question_text": result[1],
                 "correct_answer": result[2],
                 "options": result[3],
+                "question_key": result[4],
                 "answered": False,
                 "result_message": ""
             }
 
-        question_data = st.session_state.current_question
+        question_data = st.session_state.current_paragraph_question
 
         # Paragrafı göster
         st.subheader(f"📄 {question_data['paragraph']['title']}")
@@ -411,7 +599,7 @@ elif menu == "📝 Testler":
             st.write(question_data['paragraph']['paragraph'])
 
             # Türkçe çevirisini göster (sadece boşluk doldurma testinde)
-            if st.session_state.selected_test_type == "fill_blank":
+            if st.session_state.selected_paragraph_test_type == "fill_blank":
                 with st.expander("Türkçe Çeviri"):
                     st.write(question_data['paragraph']['turkish_translation'])
 
@@ -426,18 +614,22 @@ elif menu == "📝 Testler":
             selected_answer = st.radio(
                 "Seçenekler:",
                 question_data["options"],
-                key=f"answer_radio_{st.session_state.selected_test_type}_{hash(str(question_data))}"
+                key=f"paragraph_answer_radio_{st.session_state.selected_paragraph_test_type}_{hash(str(question_data))}"
             )
 
             col1, col2 = st.columns([1, 4])
             with col1:
-                if st.button("Cevapla", key="answer_btn", type="primary"):
+                if st.button("Cevapla", key="paragraph_answer_btn", type="primary"):
                     # Cevabı işle
                     is_correct = selected_answer == question_data["correct_answer"]
 
+                    # Kullanılan soruyu işaretle
+                    if question_data["question_key"] not in question_data["paragraph"]["used_questions"]:
+                        question_data["paragraph"]["used_questions"].append(question_data["question_key"])
+
                     # Sayaçları güncelle
                     score_data["questions_answered_today"] += 1
-                    test_type = st.session_state.selected_test_type
+                    test_type = st.session_state.selected_paragraph_test_type
 
                     if test_type == "en_to_tr":
                         score_data["en_to_tr_answered"] += 1
@@ -449,7 +641,152 @@ elif menu == "📝 Testler":
                         score_data["fill_blank_answered"] += 1
                         score_data["daily"][today_str]["fill_blank_answered"] += 1
 
-                    # Basit puanlama (geliştirilecek)
+                    # Puanlama
+                    if is_correct:
+                        score_data["total_score"] += 1
+                        score_data["daily"][today_str]["score"] += 1
+                        score_data["daily"][today_str]["correct"] += 1
+                        score_data["correct_streak"] += 1
+                        score_data["wrong_streak"] = 0
+                        question_data["result_message"] = "✅ Doğru! (+1 puan)"
+                    else:
+                        score_data["daily"][today_str]["wrong"] += 1
+                        score_data["wrong_streak"] += 1
+                        score_data["correct_streak"] = 0
+                        question_data[
+                            "result_message"] = f"❌ Yanlış! Doğru cevap: **{question_data['correct_answer']}**"
+
+                    score_data["daily"][today_str]["questions_answered"] += 1
+                    question_data["answered"] = True
+                    safe_save_data()
+                    st.rerun()
+
+        # Cevap verildiyse sonucu göster
+        else:
+            if "✅" in question_data["result_message"]:
+                st.success(question_data["result_message"])
+            else:
+                st.error(question_data["result_message"])
+
+            # Sonraki soru butonu
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col1:
+                if st.button("🔄 Aynı Paragraf - Sonraki Soru", key="next_paragraph_question", type="primary",
+                             use_container_width=True):
+                    st.session_state.current_paragraph_question = None
+                    # Aktif paragrafı koruyarak devam et
+                    st.rerun()
+
+            with col2:
+                if st.button("📄 Yeni Paragraf", key="new_paragraph", use_container_width=True):
+                    st.session_state.current_paragraph_question = None
+                    st.session_state.active_paragraph = None  # Yeni paragraf seçilsin
+                    st.rerun()
+
+            with col3:
+                if st.button("🏠 Test Menüsüne Dön", key="back_to_paragraph_menu", use_container_width=True):
+                    st.session_state.selected_paragraph_test_type = None
+                    st.session_state.current_paragraph_question = None
+                    st.session_state.active_paragraph = None
+                    st.rerun()
+    else:
+        st.info("👆 Yukarıdaki butonlardan bir paragraf test türü seçin")
+
+# -------------------- Cümle Testleri --------------------
+
+elif menu == "✏️ Cümle Testleri":
+    st.header("✏️ Cümle Testleri")
+    st.info("Bu testlerde kelimelerinizden oluşturulan cümleler kullanılır.")
+
+    if len(words) == 0:
+        st.warning("⚠️ Test çözebilmek için en az 3 kelime olmalı!")
+        st.stop()
+
+    # Test türü seçimi
+    if "selected_sentence_test_type" not in st.session_state:
+        st.session_state.selected_sentence_test_type = None
+
+    # Test türü butonları
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("🇺🇸➡️🇹🇷 Cümle Çevirisi (EN→TR)", use_container_width=True,
+                     type="primary" if st.session_state.selected_sentence_test_type == "sentence_en_to_tr" else "secondary"):
+            st.session_state.selected_sentence_test_type = "sentence_en_to_tr"
+            st.session_state.current_sentence_question = None
+
+    with col2:
+        if st.button("🇹🇷➡️🇺🇸 Cümle Çevirisi (TR→EN)", use_container_width=True,
+                     type="primary" if st.session_state.selected_sentence_test_type == "sentence_tr_to_en" else "secondary"):
+            st.session_state.selected_sentence_test_type = "sentence_tr_to_en"
+            st.session_state.current_sentence_question = None
+
+    with col3:
+        if st.button("📝 Cümle Boşluk Doldurma", use_container_width=True,
+                     type="primary" if st.session_state.selected_sentence_test_type == "sentence_fill_blank" else "secondary"):
+            st.session_state.selected_sentence_test_type = "sentence_fill_blank"
+            st.session_state.current_sentence_question = None
+
+    # Test seçilmişse soruyu göster
+    if st.session_state.selected_sentence_test_type:
+        st.divider()
+
+        # Mevcut soruyu kontrol et, yoksa yeni soru üret
+        if "current_sentence_question" not in st.session_state or st.session_state.current_sentence_question is None:
+            # Test türünü dönüştür (sentence_ prefix'ini kaldır)
+            test_type = st.session_state.selected_sentence_test_type.replace("sentence_", "")
+            result = generate_sentence_question(words, test_type)
+
+            if result[0] is None:  # Soru üretilemezse
+                st.error("Cümle sorusu üretilemiyor! Kelime listesini kontrol edin.")
+                st.session_state.selected_sentence_test_type = None
+                st.stop()
+
+            st.session_state.current_sentence_question = {
+                "question_obj": result[0],
+                "question_text": result[1],
+                "correct_answer": result[2],
+                "options": result[3],
+                "answered": False,
+                "result_message": ""
+            }
+
+        question_data = st.session_state.current_sentence_question
+
+        # Kelime listesini göster
+        with st.expander("📝 Kullanılan Kelimeler", expanded=False):
+            # Son 10 kelimeyi göster
+            recent_words = words[-10:] if len(words) >= 10 else words
+            st.write(", ".join(recent_words))
+            if len(words) > 10:
+                st.write(f"... ve {len(words) - 10} kelime daha")
+
+        st.divider()
+
+        # Soruyu göster
+        st.subheader("Soru:")
+        st.write(question_data["question_text"])
+
+        # Cevap verilmemişse seçenekleri göster
+        if not question_data["answered"]:
+            selected_answer = st.radio(
+                "Seçenekler:",
+                question_data["options"],
+                key=f"sentence_answer_radio_{st.session_state.selected_sentence_test_type}_{hash(str(question_data))}"
+            )
+
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("Cevapla", key="sentence_answer_btn", type="primary"):
+                    # Cevabı işle
+                    is_correct = selected_answer == question_data["correct_answer"]
+
+                    # Sayaçları güncelle
+                    score_data["questions_answered_today"] += 1
+                    score_data["sentence_test_answered"] += 1
+                    score_data["daily"][today_str]["sentence_test_answered"] += 1
+
+                    # Puanlama (cümle testleri için aynı puanlama)
                     if is_correct:
                         score_data["total_score"] += 1
                         score_data["daily"][today_str]["score"] += 1
@@ -479,17 +816,31 @@ elif menu == "📝 Testler":
             # Sonraki soru butonu
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔄 Sonraki Soru", key="next_question", type="primary", use_container_width=True):
-                    st.session_state.current_question = None
+                if st.button("🔄 Sonraki Cümle Sorusu", key="next_sentence_question", type="primary",
+                             use_container_width=True):
+                    st.session_state.current_sentence_question = None
                     st.rerun()
 
             with col2:
-                if st.button("🏠 Test Menüsüne Dön", key="back_to_menu", use_container_width=True):
-                    st.session_state.selected_test_type = None
-                    st.session_state.current_question = None
+                if st.button("🏠 Test Menüsüne Dön", key="back_to_sentence_menu", use_container_width=True):
+                    st.session_state.selected_sentence_test_type = None
+                    st.session_state.current_sentence_question = None
                     st.rerun()
     else:
-        st.info("👆 Yukarıdaki butonlardan bir test türü seçin")
+        st.info("👆 Yukarıdaki butonlardan bir cümle test türü seçin")
+
+        # Kelime listesi önizlemesi
+        st.subheader("📝 Kelimeleriniz")
+        if words:
+            # Kelimeleri 5'erli gruplar halinde göster
+            cols = st.columns(5)
+            for i, word in enumerate(words):
+                with cols[i % 5]:
+                    st.write(f"• {word}")
+                if (i + 1) % 10 == 0:  # Her 10 kelimede bir boşluk bırak
+                    st.write("")
+        else:
+            st.info("Henüz kelime eklenmemiş.")
 
 # -------------------- İstatistikler --------------------
 
@@ -555,12 +906,27 @@ elif menu == "📊 İstatistikler":
             total_soru = sum(v.get("questions_answered", 0) for v in score_data["daily"].values())
             st.metric("❓ Toplam Soru", total_soru)
 
+        # Test türlerine göre istatistikler
+        st.subheader("📊 Test Türleri İstatistikleri")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**📄 Paragraf Testleri:**")
+            st.write(f"🇺🇸➡️🇹🇷 EN→TR: {score_data.get('en_to_tr_answered', 0)}")
+            st.write(f"🇹🇷➡️🇺🇸 TR→EN: {score_data.get('tr_to_en_answered', 0)}")
+            st.write(f"📝 Boşluk Doldurma: {score_data.get('fill_blank_answered', 0)}")
+
+        with col2:
+            st.markdown("**✏️ Cümle Testleri:**")
+            st.write(f"✏️ Toplam Cümle Testi: {score_data.get('sentence_test_answered', 0)}")
+            st.write(f"📝 Kelime Sayısı: {len(words)}")
+
 # -------------------- Paragraf Ekle --------------------
 
 elif menu == "➕ Paragraf Ekle":
     st.header("➕ Paragraf Ekle")
 
-    tab1, tab2 = st.tabs(["➕ Yeni Paragraf", "📚 Paragraf Listesi"])
+    tab1, tab2, tab3 = st.tabs(["➕ Yeni Paragraf", "📚 Paragraf Listesi", "📝 Kelime Yönetimi"])
 
     with tab1:
         st.subheader("➕ Yeni Paragraf Ekle")
@@ -600,7 +966,8 @@ elif menu == "➕ Paragraf Ekle":
                         "turkish_translation": turkish_translation.strip(),
                         "questions": [],  # Sorular ayrıca eklenecek
                         "added_date": today_str,
-                        "difficulty": difficulty
+                        "difficulty": difficulty,
+                        "used_questions": []  # Kullanılan soruları takip et
                     }
 
                     paragraflar.append(yeni_paragraf)
@@ -628,9 +995,89 @@ elif menu == "➕ Paragraf Ekle":
                         paragraf['turkish_translation'])
 
                     st.write(f"**Soru Sayısı:** {len(paragraf.get('questions', []))}")
+                    st.write(f"**Kullanılan Sorular:** {len(paragraf.get('used_questions', []))}")
                     st.write(f"**Eklenme Tarihi:** {paragraf.get('added_date', 'Bilinmiyor')}")
+
+                    # Kullanılan soruları sıfırla butonu
+                    if paragraf.get('used_questions', []):
+                        if st.button(f"🔄 Soruları Sıfırla", key=f"reset_questions_{paragraf['id']}"):
+                            paragraf['used_questions'] = []
+                            safe_save_data()
+                            st.success("✅ Bu paragrafın kullanılan soruları sıfırlandı!")
+                            st.rerun()
         else:
             st.info("📝 Henüz eklenmiş paragraf yok.")
+
+    with tab3:
+        st.subheader("📝 Kelime Yönetimi")
+
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            st.write(f"**Mevcut kelime sayısı:** {len(words)}")
+
+            # Yeni kelime ekleme
+            with st.form("add_word_form"):
+                new_word = st.text_input("Yeni Kelime Ekle", placeholder="örn: innovation")
+                if st.form_submit_button("➕ Ekle"):
+                    if new_word.strip() and new_word.strip().lower() not in [w.lower() for w in words]:
+                        words.append(new_word.strip().lower())
+                        if save_words(words):
+                            st.success(f"✅ Kelime eklendi: **{new_word.strip()}**")
+                            st.rerun()
+                    elif new_word.strip().lower() in [w.lower() for w in words]:
+                        st.warning("⚠️ Bu kelime zaten mevcut!")
+                    else:
+                        st.warning("⚠️ Geçerli bir kelime girin!")
+
+            # Toplu kelime ekleme
+            with st.form("bulk_add_words"):
+                bulk_words = st.text_area("Toplu Kelime Ekleme (virgül ile ayırın)",
+                                          placeholder="word1, word2, word3")
+                if st.form_submit_button("📝 Toplu Ekle"):
+                    if bulk_words.strip():
+                        new_words = [w.strip().lower() for w in bulk_words.split(",") if w.strip()]
+                        added_count = 0
+                        for word in new_words:
+                            if word and word not in [w.lower() for w in words]:
+                                words.append(word)
+                                added_count += 1
+
+                        if save_words(words):
+                            st.success(f"✅ {added_count} kelime eklendi!")
+                            st.rerun()
+                    else:
+                        st.warning("⚠️ Kelime girin!")
+
+        with col2:
+            # Kelime silme
+            if words:
+                selected_word = st.selectbox("Silmek için kelime seçin:", words)
+                if st.button("🗑️ Kelimeyi Sil", type="secondary"):
+                    words.remove(selected_word)
+                    if save_words(words):
+                        st.success(f"✅ Kelime silindi: **{selected_word}**")
+                        st.rerun()
+
+            # Tüm kelimeleri sıfırla
+            if st.button("🔄 Varsayılanlara Dön", type="secondary"):
+                if st.button("⚠️ EMİNİM!", key="reset_words_confirm"):
+                    words.clear()
+                    words.extend(DEFAULT_WORDS)
+                    if save_words(words):
+                        st.success("✅ Kelimeler varsayılana döndürüldü!")
+                        st.rerun()
+
+        # Kelime listesi
+        st.subheader("📋 Mevcut Kelimeler")
+        if words:
+            # 5 sütunlu gösterim
+            cols = st.columns(5)
+            for i, word in enumerate(words):
+                with cols[i % 5]:
+                    st.write(f"• {word}")
+        else:
+            st.info("Henüz kelime eklenmemiş.")
 
 # -------------------- Ayarlar --------------------
 
@@ -667,6 +1114,7 @@ elif menu == "🔧 Ayarlar":
             st.write("**Dosya Durumu:**")
             st.write(f"📄 Paragraf dosyası: {'✅' if os.path.exists(DATA_FILE) else '❌'}")
             st.write(f"📊 Puan dosyası: {'✅' if os.path.exists(SCORE_FILE) else '❌'}")
+            st.write(f"📝 Kelime dosyası: {'✅' if os.path.exists(WORDS_FILE) else '❌'}")
             st.write(f"💾 Paragraf backup: {'✅' if os.path.exists(BACKUP_DATA_FILE) else '❌'}")
             st.write(f"💾 Puan backup: {'✅' if os.path.exists(BACKUP_SCORE_FILE) else '❌'}")
 
@@ -683,6 +1131,7 @@ elif menu == "🔧 Ayarlar":
             st.write("**📥 Veri İçe Aktarma:**")
             uploaded_paragraflar = st.file_uploader("Paragraflar JSON", type=['json'], key="upload_paragraflar")
             uploaded_puan = st.file_uploader("Puan JSON", type=['json'], key="upload_puan")
+            uploaded_words = st.file_uploader("Kelimeler JSON", type=['json'], key="upload_words")
 
             if st.button("📥 İçe Aktar", type="primary"):
                 try:
@@ -706,7 +1155,17 @@ elif menu == "🔧 Ayarlar":
                         else:
                             st.error("❌ Puan verisi hatalı format!")
 
-                    if success_messages and (uploaded_paragraflar or uploaded_puan):
+                    if uploaded_words:
+                        words_data = json.load(uploaded_words)
+                        if isinstance(words_data, list):
+                            words.clear()
+                            words.extend(words_data)
+                            save_words(words)
+                            success_messages.append("✅ Kelimeler içe aktarıldı!")
+                        else:
+                            st.error("❌ Kelimeler verisi hatalı format!")
+
+                    if success_messages:
                         safe_save_data()
                         for msg in success_messages:
                             st.success(msg)
@@ -736,60 +1195,107 @@ elif menu == "🔧 Ayarlar":
                     "application/json"
                 )
 
+            if st.button("📤 Kelimeleri İndir", use_container_width=True):
+                words_json = json.dumps(words, ensure_ascii=False, indent=2)
+                st.download_button(
+                    "⬇️ kelimeler.json İndir",
+                    words_json,
+                    "kelimeler_backup.json",
+                    "application/json"
+                )
+
         st.divider()
 
         st.subheader("⚠️ Tehlikeli İşlemler")
         st.warning("Bu işlemler geri alınamaz!")
 
-        if st.button("🗑️ Tüm Verileri Sıfırla", type="secondary"):
-            if st.button("⚠️ EMİNİM, SİL!", key="confirm_reset"):
-                paragraflar.clear()
-                score_data.clear()
-                score_data.update({
-                    "total_score": 0,
-                    "daily": {},
-                    "last_check_date": None,
-                    "questions_answered_today": 0,
-                    "correct_streak": 0,
-                    "wrong_streak": 0,
-                    "en_to_tr_answered": 0,
-                    "tr_to_en_answered": 0,
-                    "fill_blank_answered": 0
-                })
-                if safe_save_data():
-                    st.success("✅ Tüm veriler sıfırlandı!")
-                    st.rerun()
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("🗑️ Tüm Verileri Sıfırla", type="secondary"):
+                if st.button("⚠️ EMİNİM, SİL!", key="confirm_reset"):
+                    paragraflar.clear()
+                    score_data.clear()
+                    score_data.update({
+                        "total_score": 0,
+                        "daily": {},
+                        "last_check_date": None,
+                        "questions_answered_today": 0,
+                        "correct_streak": 0,
+                        "wrong_streak": 0,
+                        "en_to_tr_answered": 0,
+                        "tr_to_en_answered": 0,
+                        "fill_blank_answered": 0,
+                        "sentence_test_answered": 0
+                    })
+                    if safe_save_data():
+                        st.success("✅ Tüm veriler sıfırlandı!")
+                        st.rerun()
+
+        with col2:
+            if st.button("🔄 Tüm Soruları Sıfırla", type="secondary"):
+                if st.button("⚠️ EMİNİM, SIFIRLA!", key="confirm_reset_questions"):
+                    for paragraf in paragraflar:
+                        paragraf["used_questions"] = []
+                    if safe_save_data():
+                        st.success("✅ Tüm paragrafların kullanılan soruları sıfırlandı!")
+                        st.rerun()
 
     with tab2:
         st.subheader("ℹ️ Uygulama Bilgileri")
 
-        st.write("**🔧 Versiyon:** 1.0 - Temel İskelet")
-        st.write("**📅 Oluşturma Tarihi:** Bugün")
+        st.write("**🔧 Versiyon:** 2.0 - Gelişmiş Sistem")
+        st.write("**📅 Güncelleme Tarihi:** Bugün")
 
-        st.markdown("### ✨ Özellikler:")
+        st.markdown("### ✨ Yeni Özellikler:")
         st.success("""
+        🆕 **v2.0 Güncellemeleri:**
+        • Aynı paragraftan birden fazla soru çözme
+        • Cümle testleri sistemi
+        • Kelime tabanlı cümle soruları
+        • Kullanılan soru takip sistemi
+        • Gelişmiş kelime yönetimi
+        • Cümle testi istatistikleri
+
         ✅ **Mevcut Özellikler:**
         • Paragraf ekleme ve listeleme
-        • 3 farklı test türü (EN→TR, TR→EN, Boşluk Doldurma)
+        • 3 farklı paragraf test türü (EN→TR, TR→EN, Boşluk Doldurma)
+        • 3 farklı cümle test türü
         • Temel puanlama sistemi
         • Günlük ve genel istatistikler
         • Veri yedekleme ve geri yükleme
         • Güvenli veri kaydetme sistemi
-
-        🔄 **Planlanan Özellikler:**
-        • Gelişmiş puanlama sistemi
-        • Günlük hedefler
-        • Combo sistemi
-        • Zorluk seviyesine göre puanlama
-        • Soru ekleme arayüzü
-        • Paragraf düzenleme
+        • Kelime listesi yönetimi
         """)
 
         st.write("**🎯 Test Türleri:**")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("""
+            **📄 Paragraf Testleri:**
+            • **EN→TR:** İngilizce cümle veriliyor, Türkçe karşılığı bulunuyor
+            • **TR→EN:** Türkçe cümle veriliyor, İngilizce karşılığı bulunuyor  
+            • **Boşluk Doldurma:** Cümlede boş bırakılan kelime tamamlanıyor
+
+            *Artık aynı paragraftan birden fazla soru çözebilirsiniz!*
+            """)
+
+        with col2:
+            st.info("""
+            **✏️ Cümle Testleri:**
+            • **Cümle EN→TR:** Kelimelerden oluşan cümle çevirisi
+            • **Cümle TR→EN:** Kelimelerden oluşan cümle çevirisi
+            • **Cümle Boşluk:** Kelime tabanlı boşluk doldurma
+
+            *Kelime listenizden otomatik cümle üretimi!*
+            """)
+
+        st.write("**🔄 Soru Sistemi:**")
         st.info("""
-        • **EN→TR:** İngilizce cümle veriliyor, Türkçe karşılığı bulunuyor
-        • **TR→EN:** Türkçe cümle veriliyor, İngilizce karşılığı bulunuyor  
-        • **Boşluk Doldurma:** Cümlede boş bırakılan kelime tamamlanıyor
+        • **Paragraf Testleri:** Her paragraftan soruları teker teker kullanır, hepsi bittiğinde yeniden başlar
+        • **Cümle Testleri:** Kelime listenizden rastgele cümleler üretir
+        • **Akıllı Tekrar:** Aynı paragraftan sonraki soruya geçebilir veya yeni paragraf seçebilirsiniz
         """)
 
         st.write("**💾 Veri Güvenliği:**")
@@ -798,6 +1304,17 @@ elif menu == "🔧 Ayarlar":
         • Hata durumunda backup'tan geri yükleme
         • JSON formatında veri saklama
         • Manuel veri dışa/içe aktarma imkanı
+        • Kelime listesi yönetimi
+        • Kullanılan soru takibi
         """)
 
-# Son satırda eksik kapanış parantezi eklendi
+        st.write("**🎮 Kullanım İpuçları:**")
+        st.success("""
+        • Paragraf testlerinde "Aynı Paragraf - Sonraki Soru" ile devam edin
+        • Cümle testleri için kelime listenizi güncel tutun
+        • İstatistikler sekmesinden ilerlemenizi takip edin
+        • Düzenli backup alın
+        • Kullanılan soruları sıfırlayarak tekrar çözebilirsiniz
+        """)
+
+# -------------------- Son --------------------

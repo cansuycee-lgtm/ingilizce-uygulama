@@ -1526,13 +1526,8 @@ elif menu == "🔧 Ayarlar":
                         f.write(uploaded_zip.getvalue())
                     
                     if restore_from_zip("temp_backup.zip"):
-                        # Verileri yeniden yükle
-                        global paragraflar, score_data, words, synonyms
-                        paragraflar, score_data = safe_load_data()
-                        words = load_words()
-                        synonyms = load_synonyms()
                         st.success("✅ ZIP backup'tan başarıyla geri yüklendi!")
-                        st.rerun()
+                        st.info("🔄 Sayfayı yenileyin veya uygulamayı yeniden başlatın.")
                     else:
                         st.error("❌ ZIP'ten geri yükleme başarısız!")
                     
@@ -1766,3 +1761,4 @@ elif menu == "🔧 Ayarlar":
         """)
 
 # -------------------- Son --------------------
+

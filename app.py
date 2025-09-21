@@ -3,6 +3,7 @@ import json
 import os
 import random
 import shutil
+import zipfile
 from datetime import datetime
 import pandas as pd
 
@@ -11,7 +12,8 @@ DATA_FILE = "paragraflar.json"
 SCORE_FILE = "puan_paragraf.json"
 BACKUP_DATA_FILE = "paragraflar_backup.json"
 BACKUP_SCORE_FILE = "puan_paragraf_backup.json"
-WORDS_FILE = "kelimeler.json"  # Kelimeler dosyası
+WORDS_FILE = "kelimeler.json"
+SYNONYM_FILE = "es_anlamli.json"  # Eş anlamlı kelimeler
 
 # -------------------- Varsayılan Kelimeler --------------------
 DEFAULT_WORDS = [
@@ -24,8 +26,80 @@ DEFAULT_WORDS = [
     "popular", "successful", "important", "necessary", "possible"
 ]
 
+# -------------------- Varsayılan Eş Anlamlı Kelimeler --------------------
+DEFAULT_SYNONYMS = [
+    {
+        "id": 1,
+        "type": "synonym",
+        "question": "Which of the following expressions refer to 'important'?",
+        "options": ["unusual", "weird", "crucial", "essential", "significant"],
+        "correct_answers": ["crucial", "essential", "significant"],
+        "solution": "'Important' means 'crucial, essential, significant'."
+    },
+    {
+        "id": 2,
+        "type": "synonym",
+        "question": "Which of the following expressions refer to 'strange'?",
+        "options": ["weird", "unusual", "hazardous", "beneficial", "peculiar"],
+        "correct_answers": ["weird", "unusual", "peculiar"],
+        "solution": "'Strange' is synonymous with 'weird, unusual, peculiar'."
+    },
+    {
+        "id": 3,
+        "type": "synonym",
+        "question": "Which of the following expressions refer to 'required'?",
+        "options": ["essential", "fundamental", "hazardous", "needed", "urgent"],
+        "correct_answers": ["essential", "fundamental", "needed"],
+        "solution": "'Required' means something that is essential, fundamental, or needed."
+    },
+    {
+        "id": 4,
+        "type": "synonym",
+        "question": "Which of the following expressions refer to 'huge'?",
+        "options": ["tiny", "immense", "giant", "stable", "consistent"],
+        "correct_answers": ["immense", "giant"],
+        "solution": "'Huge' means very big, similar to 'immense' or 'giant'."
+    },
+    {
+        "id": 5,
+        "type": "meaning",
+        "question": "Which of the following expressions have a 'negative meaning'?",
+        "options": ["hazardous", "beneficial", "distinct", "invaluable", "disappointing"],
+        "correct_answers": ["hazardous", "disappointing"],
+        "solution": "'Hazardous' (dangerous) and 'disappointing' carry negative meanings."
+    }
+]
+
 
 # -------------------- Yardımcı Fonksiyonlar --------------------
+
+def load_synonyms():
+    """Eş anlamlı kelimeler dosyasını yükle"""
+    try:
+        if os.path.exists(SYNONYM_FILE):
+            with open(SYNONYM_FILE, "r", encoding="utf-8") as f:
+                synonyms = json.load(f)
+                return synonyms if isinstance(synonyms, list) and synonyms else DEFAULT_SYNONYMS
+        else:
+            # Varsayılan eş anlamlı kelimeleri kaydet
+            with open(SYNONYM_FILE, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_SYNONYMS, f, ensure_ascii=False, indent=2)
+            return DEFAULT_SYNONYMS
+    except Exception as e:
+        st.error(f"Eş anlamlı kelimeler yüklenirken hata: {e}")
+        return DEFAULT_SYNONYMS
+
+
+def save_synonyms(synonyms):
+    """Eş anlamlı kelimeleri kaydet"""
+    try:
+        with open(SYNONYM_FILE, "w", encoding="utf-8") as f:
+            json.dump(synonyms, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Eş anlamlı kelimeler kaydedilirken hata: {e}")
+        return False
+
 
 def load_words():
     """Kelimeler dosyasını yükle"""
@@ -93,13 +167,6 @@ def generate_sentence_question(words, question_type):
             question = random.choice(sentence_templates["en_to_tr"])
             correct_answer = question  # Türkçe çeviri olacak (basitleştirilmiş)
 
-            # Basit çeviri örnekleri
-            translations = {
-                "Modern communication helps people communicate better.": "Modern iletişim insanların daha iyi iletişim kurmasına yardımcı olur.",
-                "Modern technology helps people communicate better.": "Modern teknoloji insanların daha iyi iletişim kurmasına yardımcı olur.",
-                "Modern education helps people communicate better.": "Modern eğitim insanların daha iyi iletişim kurmasına yardımcı olur."
-            }
-
             # Genel çeviri şablonu
             if "helps people communicate better" in question:
                 word = question.split()[1]  # Modern'dan sonraki kelime
@@ -160,6 +227,55 @@ def create_backup():
         return True
     except Exception as e:
         st.error(f"Backup oluşturulamadı: {e}")
+        return False
+
+
+def create_zip_backup():
+    """ZIP formatında tam backup oluştur"""
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_filename = f"yds_backup_{timestamp}.zip"
+        
+        with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Ana dosyaları ekle
+            if os.path.exists(DATA_FILE):
+                zipf.write(DATA_FILE)
+            if os.path.exists(SCORE_FILE):
+                zipf.write(SCORE_FILE)
+            if os.path.exists(WORDS_FILE):
+                zipf.write(WORDS_FILE)
+            if os.path.exists(SYNONYM_FILE):
+                zipf.write(SYNONYM_FILE)
+                
+            # Backup dosyalarını da ekle
+            if os.path.exists(BACKUP_DATA_FILE):
+                zipf.write(BACKUP_DATA_FILE)
+            if os.path.exists(BACKUP_SCORE_FILE):
+                zipf.write(BACKUP_SCORE_FILE)
+                
+            # Meta bilgi dosyası
+            meta_info = {
+                "backup_date": timestamp,
+                "version": "3.0",
+                "files": ["paragraflar.json", "puan_paragraf.json", "kelimeler.json", "es_anlamli.json"]
+            }
+            
+            zipf.writestr("backup_info.json", json.dumps(meta_info, ensure_ascii=False, indent=2))
+            
+        return zip_filename
+    except Exception as e:
+        st.error(f"ZIP backup oluşturulamadı: {e}")
+        return None
+
+
+def restore_from_zip(zip_file):
+    """ZIP dosyasından veri geri yükle"""
+    try:
+        with zipfile.ZipFile(zip_file, 'r') as zipf:
+            zipf.extractall(".")
+        return True
+    except Exception as e:
+        st.error(f"ZIP'ten geri yükleme başarısız: {e}")
         return False
 
 
@@ -252,7 +368,8 @@ def initialize_default_data():
                 "en_to_tr_answered": 0,
                 "tr_to_en_answered": 0,
                 "fill_blank_answered": 0,
-                "sentence_test_answered": 0  # Yeni: cümle testi sayacı
+                "sentence_test_answered": 0,  # Cümle testi sayacı
+                "synonym_test_answered": 0    # Eş anlamlı kelime testi sayacı
             }
         },
         "last_check_date": "2025-01-15",
@@ -262,7 +379,8 @@ def initialize_default_data():
         "en_to_tr_answered": 0,
         "tr_to_en_answered": 0,
         "fill_blank_answered": 0,
-        "sentence_test_answered": 0  # Yeni: cümle testi sayacı
+        "sentence_test_answered": 0,  # Cümle testi sayacı
+        "synonym_test_answered": 0    # Eş anlamlı kelime testi sayacı
     }
 
     return default_paragraflar, default_score_data
@@ -281,7 +399,8 @@ def safe_load_data():
         "en_to_tr_answered": 0,
         "tr_to_en_answered": 0,
         "fill_blank_answered": 0,
-        "sentence_test_answered": 0  # Yeni sayaç
+        "sentence_test_answered": 0,  # Yeni sayaç
+        "synonym_test_answered": 0    # Yeni sayaç
     }
 
     # Ana dosyaları yüklemeyi dene
@@ -311,11 +430,15 @@ def safe_load_data():
                 # Eski verilere yeni sayaçları ekle
                 if "sentence_test_answered" not in score_data:
                     score_data["sentence_test_answered"] = 0
+                if "synonym_test_answered" not in score_data:
+                    score_data["synonym_test_answered"] = 0
 
-                # Günlük verilere de yeni sayaç ekle
+                # Günlük verilere de yeni sayaçları ekle
                 for daily_data in score_data.get("daily", {}).values():
                     if "sentence_test_answered" not in daily_data:
                         daily_data["sentence_test_answered"] = 0
+                    if "synonym_test_answered" not in daily_data:
+                        daily_data["synonym_test_answered"] = 0
         else:
             _, score_data = initialize_default_data()
 
@@ -394,9 +517,28 @@ def generate_paragraph_question(test_type, paragraf):
     return selected_question, question_text, correct_answer, options, question_key
 
 
+def generate_synonym_question(synonyms):
+    """Eş anlamlı kelime sorusu üret"""
+    if not synonyms:
+        return None, None, None, None, None
+    
+    selected_question = random.choice(synonyms)
+    
+    question_text = selected_question["question"]
+    correct_answers = selected_question["correct_answers"]
+    options = selected_question["options"].copy()
+    solution = selected_question.get("solution", "")
+    
+    # Seçenekleri karıştır
+    random.shuffle(options)
+    
+    return selected_question, question_text, correct_answers, options, solution
+
+
 # -------------------- Ana Veriler --------------------
 paragraflar, score_data = safe_load_data()
 words = load_words()  # Kelimeleri yükle
+synonyms = load_synonyms()  # Eş anlamlı kelimeleri yükle
 
 current_time = datetime.now()
 today = current_time.date()
@@ -416,6 +558,7 @@ if score_data.get("last_check_date") != today_str:
     score_data["tr_to_en_answered"] = 0
     score_data["fill_blank_answered"] = 0
     score_data["sentence_test_answered"] = 0
+    score_data["synonym_test_answered"] = 0
 
 if today_str not in score_data["daily"]:
     score_data["daily"][today_str] = {
@@ -426,15 +569,16 @@ if today_str not in score_data["daily"]:
         "en_to_tr_answered": 0,
         "tr_to_en_answered": 0,
         "fill_blank_answered": 0,
-        "sentence_test_answered": 0
+        "sentence_test_answered": 0,
+        "synonym_test_answered": 0
     }
 
 safe_save_data()
 
 # -------------------- Streamlit Arayüz --------------------
 
-st.set_page_config(page_title="YDS Paragraf Test", page_icon="📄", layout="wide")
-st.title("📄 YDS Paragraf Test Uygulaması v2.0")
+st.set_page_config(page_title="YDS Test Uygulaması", page_icon="📄", layout="wide")
+st.title("📄 YDS Test Uygulaması v3.0")
 
 # Sidebar bilgileri
 with st.sidebar:
@@ -448,6 +592,7 @@ with st.sidebar:
     st.write(f"❓ **Bugün çözülen:** {bugun_soru} soru")
     st.write(f"📄 **Toplam paragraf:** {len(paragraflar)}")
     st.write(f"📝 **Kelime sayısı:** {len(words)}")
+    st.write(f"🔗 **Eş anlamlı soru:** {len(synonyms)}")
 
     # Test türü ilerlemeleri
     st.markdown("### 🎯 Test İlerlemeleri")
@@ -455,11 +600,13 @@ with st.sidebar:
     tr_en_current = score_data.get("tr_to_en_answered", 0)
     fill_blank_current = score_data.get("fill_blank_answered", 0)
     sentence_current = score_data.get("sentence_test_answered", 0)
+    synonym_current = score_data.get("synonym_test_answered", 0)
 
     st.write(f"🇺🇸➡️🇹🇷 **EN→TR:** {en_tr_current}")
     st.write(f"🇹🇷➡️🇺🇸 **TR→EN:** {tr_en_current}")
     st.write(f"📝 **Boşluk Doldurma:** {fill_blank_current}")
     st.write(f"✏️ **Cümle Testi:** {sentence_current}")
+    st.write(f"🔗 **Eş Anlamlı:** {synonym_current}")
 
     # Seri durumu
     if score_data.get("correct_streak", 0) > 0:
@@ -471,7 +618,7 @@ with st.sidebar:
 # Ana menü
 menu = st.sidebar.radio(
     "📋 Menü",
-    ["🏠 Ana Sayfa", "📝 Paragraf Testleri", "✏️ Cümle Testleri", "📊 İstatistikler", "➕ Paragraf Ekle", "🔧 Ayarlar"],
+    ["🏠 Ana Sayfa", "📝 Paragraf Testleri", "✏️ Cümle Testleri", "🔗 Eş Anlamlı Testler", "📊 İstatistikler", "➕ İçerik Ekle", "🔧 Ayarlar"],
     key="main_menu"
 )
 
@@ -504,7 +651,7 @@ if menu == "🏠 Ana Sayfa":
 
     st.subheader("📊 Test Türleri Özeti")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.info(f"""
@@ -519,6 +666,13 @@ if menu == "🏠 Ana Sayfa":
         **✏️ Cümle Testleri**
         • Toplam Çözülen: {sentence_current}
         • Kelime Sayısı: {len(words)}
+        """)
+
+    with col3:
+        st.info(f"""
+        **🔗 Eş Anlamlı Testler**
+        • Toplam Çözülen: {synonym_current}
+        • Soru Sayısı: {len(synonyms)}
         """)
 
 # -------------------- Paragraf Testleri --------------------
@@ -842,6 +996,130 @@ elif menu == "✏️ Cümle Testleri":
         else:
             st.info("Henüz kelime eklenmemiş.")
 
+# -------------------- Eş Anlamlı Testler --------------------
+
+elif menu == "🔗 Eş Anlamlı Testler":
+    st.header("🔗 Eş Anlamlı Kelime Testleri")
+    st.info("Bu testlerde birden fazla doğru seçenek olabilir. Tüm doğru seçenekleri işaretleyin.")
+
+    if len(synonyms) == 0:
+        st.warning("⚠️ Test çözebilmek için en az 1 eş anlamlı kelime sorusu olmalı!")
+        st.stop()
+
+    # Mevcut soruyu kontrol et, yoksa yeni soru üret
+    if "current_synonym_question" not in st.session_state or st.session_state.current_synonym_question is None:
+        result = generate_synonym_question(synonyms)
+
+        if result[0] is None:  # Soru üretilemezse
+            st.error("Eş anlamlı kelime sorusu üretilemiyor!")
+            st.stop()
+
+        st.session_state.current_synonym_question = {
+            "question_obj": result[0],
+            "question_text": result[1],
+            "correct_answers": result[2],
+            "options": result[3],
+            "solution": result[4],
+            "answered": False,
+            "selected_answers": [],
+            "result_message": ""
+        }
+
+    question_data = st.session_state.current_synonym_question
+
+    # Soruyu göster
+    st.subheader("Soru:")
+    st.write(question_data["question_text"])
+
+    # Cevap verilmemişse seçenekleri göster
+    if not question_data["answered"]:
+        st.write("**Seçenekler:** (Birden fazla seçenek işaretleyebilirsiniz)")
+        
+        selected_options = []
+        for option in question_data["options"]:
+            if st.checkbox(option, key=f"synonym_option_{option}_{hash(str(question_data))}"):
+                selected_options.append(option)
+
+        question_data["selected_answers"] = selected_options
+
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Cevapla", key="synonym_answer_btn", type="primary"):
+                # Cevabı işle
+                correct_answers_set = set(question_data["correct_answers"])
+                selected_answers_set = set(question_data["selected_answers"])
+                
+                is_correct = correct_answers_set == selected_answers_set
+
+                # Sayaçları güncelle
+                score_data["questions_answered_today"] += 1
+                score_data["synonym_test_answered"] += 1
+                score_data["daily"][today_str]["synonym_test_answered"] += 1
+
+                # Puanlama
+                if is_correct:
+                    score_data["total_score"] += 2  # Eş anlamlı testler 2 puan
+                    score_data["daily"][today_str]["score"] += 2
+                    score_data["daily"][today_str]["correct"] += 1
+                    score_data["correct_streak"] += 1
+                    score_data["wrong_streak"] = 0
+                    question_data["result_message"] = "✅ Doğru! (+2 puan)"
+                else:
+                    score_data["daily"][today_str]["wrong"] += 1
+                    score_data["wrong_streak"] += 1
+                    score_data["correct_streak"] = 0
+                    correct_answers_str = ", ".join(question_data["correct_answers"])
+                    question_data["result_message"] = f"❌ Yanlış! Doğru cevaplar: **{correct_answers_str}**"
+
+                score_data["daily"][today_str]["questions_answered"] += 1
+                question_data["answered"] = True
+                safe_save_data()
+                st.rerun()
+
+    # Cevap verildiyse sonucu göster
+    else:
+        if "✅" in question_data["result_message"]:
+            st.success(question_data["result_message"])
+        else:
+            st.error(question_data["result_message"])
+
+        # Çözümü göster
+        if question_data["solution"]:
+            with st.expander("💡 Çözüm"):
+                st.write(question_data["solution"])
+
+        # Seçilen ve doğru cevapları karşılaştır
+        with st.expander("📊 Cevap Analizi"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**Sizin Seçtikleriniz:**")
+                if question_data["selected_answers"]:
+                    for answer in question_data["selected_answers"]:
+                        if answer in question_data["correct_answers"]:
+                            st.write(f"✅ {answer}")
+                        else:
+                            st.write(f"❌ {answer}")
+                else:
+                    st.write("Hiçbir seçenek işaretlenmedi")
+            
+            with col2:
+                st.write("**Doğru Cevaplar:**")
+                for answer in question_data["correct_answers"]:
+                    st.write(f"✅ {answer}")
+
+        # Sonraki soru butonu
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("🔄 Sonraki Soru", key="next_synonym_question", type="primary",
+                         use_container_width=True):
+                st.session_state.current_synonym_question = None
+                st.rerun()
+
+        with col2:
+            if st.button("🏠 Ana Menüye Dön", key="back_to_main_menu", use_container_width=True):
+                st.session_state.current_synonym_question = None
+                st.rerun()
+
 # -------------------- İstatistikler --------------------
 
 elif menu == "📊 İstatistikler":
@@ -908,7 +1186,7 @@ elif menu == "📊 İstatistikler":
 
         # Test türlerine göre istatistikler
         st.subheader("📊 Test Türleri İstatistikleri")
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             st.markdown("**📄 Paragraf Testleri:**")
@@ -921,12 +1199,17 @@ elif menu == "📊 İstatistikler":
             st.write(f"✏️ Toplam Cümle Testi: {score_data.get('sentence_test_answered', 0)}")
             st.write(f"📝 Kelime Sayısı: {len(words)}")
 
-# -------------------- Paragraf Ekle --------------------
+        with col3:
+            st.markdown("**🔗 Eş Anlamlı Testler:**")
+            st.write(f"🔗 Toplam Eş Anlamlı: {score_data.get('synonym_test_answered', 0)}")
+            st.write(f"📚 Soru Sayısı: {len(synonyms)}")
 
-elif menu == "➕ Paragraf Ekle":
-    st.header("➕ Paragraf Ekle")
+# -------------------- İçerik Ekle --------------------
 
-    tab1, tab2, tab3 = st.tabs(["➕ Yeni Paragraf", "📚 Paragraf Listesi", "📝 Kelime Yönetimi"])
+elif menu == "➕ İçerik Ekle":
+    st.header("➕ İçerik Ekle")
+
+    tab1, tab2, tab3, tab4 = st.tabs(["➕ Yeni Paragraf", "🔗 Eş Anlamlı Soru", "📚 İçerik Listesi", "📝 Kelime Yönetimi"])
 
     with tab1:
         st.subheader("➕ Yeni Paragraf Ekle")
@@ -980,9 +1263,77 @@ elif menu == "➕ Paragraf Ekle":
                     st.warning("⚠️ Tüm alanları doldurun.")
 
     with tab2:
-        st.subheader("📚 Paragraf Listesi")
+        st.subheader("🔗 Yeni Eş Anlamlı Soru Ekle")
 
+        with st.form("synonym_form", clear_on_submit=True):
+            question_text = st.text_input(
+                "❓ Soru Metni", 
+                placeholder="Which of the following expressions refer to 'important'?"
+            )
+
+            test_type = st.selectbox(
+                "🎯 Test Türü",
+                ["synonym", "meaning"],
+                format_func=lambda x: "Eş Anlamlı Kelime" if x == "synonym" else "Anlam Testi"
+            )
+
+            st.write("**Seçenekler:** (Her satıra bir seçenek)")
+            options_text = st.text_area(
+                "Seçenekler",
+                height=120,
+                placeholder="unusual\nweird\ncrucial\nessential\nsignificant"
+            )
+
+            st.write("**Doğru Cevaplar:** (Virgül ile ayırın)")
+            correct_answers_text = st.text_input(
+                "Doğru Cevaplar",
+                placeholder="crucial, essential, significant"
+            )
+
+            solution_text = st.text_area(
+                "💡 Çözüm Açıklaması",
+                height=80,
+                placeholder="'Important' means 'crucial, essential, significant'."
+            )
+
+            submitted_synonym = st.form_submit_button("💾 Soru Ekle", use_container_width=True)
+
+            if submitted_synonym:
+                if question_text.strip() and options_text.strip() and correct_answers_text.strip():
+                    # Seçenekleri işle
+                    options = [opt.strip() for opt in options_text.strip().split('\n') if opt.strip()]
+                    correct_answers = [ans.strip() for ans in correct_answers_text.strip().split(',') if ans.strip()]
+
+                    # Doğru cevapların seçeneklerde olup olmadığını kontrol et
+                    if all(ans in options for ans in correct_answers):
+                        new_id = max([q.get("id", 0) for q in synonyms], default=0) + 1
+
+                        yeni_soru = {
+                            "id": new_id,
+                            "type": test_type,
+                            "question": question_text.strip(),
+                            "options": options,
+                            "correct_answers": correct_answers,
+                            "solution": solution_text.strip() or f"Doğru cevaplar: {', '.join(correct_answers)}"
+                        }
+
+                        synonyms.append(yeni_soru)
+
+                        if save_synonyms(synonyms):
+                            st.success(f"✅ Eş anlamlı soru kaydedildi!")
+                        else:
+                            st.error("❌ Kayıt sırasında hata oluştu!")
+                    else:
+                        st.error("❌ Doğru cevaplar seçenekler arasında bulunmuyor!")
+                else:
+                    st.warning("⚠️ Soru metni, seçenekler ve doğru cevaplar alanlarını doldurun.")
+
+    with tab3:
+        st.subheader("📚 İçerik Listesi")
+
+        # Paragraflar
         if paragraflar:
+            st.write("**📄 Paragraflar:**")
             for i, paragraf in enumerate(paragraflar, 1):
                 with st.expander(f"{i}. {paragraf['title']} ({paragraf.get('difficulty', 'intermediate')})"):
                     st.write("**İngilizce:**")
@@ -1005,10 +1356,29 @@ elif menu == "➕ Paragraf Ekle":
                             safe_save_data()
                             st.success("✅ Bu paragrafın kullanılan soruları sıfırlandı!")
                             st.rerun()
-        else:
-            st.info("📝 Henüz eklenmiş paragraf yok.")
 
-    with tab3:
+        # Eş anlamlı sorular
+        if synonyms:
+            st.write("**🔗 Eş Anlamlı Sorular:**")
+            for i, soru in enumerate(synonyms, 1):
+                with st.expander(f"{i}. {soru['question'][:50]}... ({soru['type']})"):
+                    st.write(f"**Soru:** {soru['question']}")
+                    st.write(f"**Seçenekler:** {', '.join(soru['options'])}")
+                    st.write(f"**Doğru Cevaplar:** {', '.join(soru['correct_answers'])}")
+                    if soru.get('solution'):
+                        st.write(f"**Çözüm:** {soru['solution']}")
+
+                    # Soru silme butonu
+                    if st.button(f"🗑️ Sil", key=f"delete_synonym_{soru['id']}"):
+                        synonyms.remove(soru)
+                        if save_synonyms(synonyms):
+                            st.success("✅ Soru silindi!")
+                            st.rerun()
+
+        if not paragraflar and not synonyms:
+            st.info("📝 Henüz eklenmiş içerik yok.")
+
+    with tab4:
         st.subheader("📝 Kelime Yönetimi")
 
         col1, col2 = st.columns([2, 1])
@@ -1099,6 +1469,23 @@ elif menu == "🔧 Ayarlar":
                 else:
                     st.error("❌ Backup oluşturulamadı!")
 
+            if st.button("📦 ZIP Backup İndir", use_container_width=True, type="primary"):
+                zip_filename = create_zip_backup()
+                if zip_filename:
+                    with open(zip_filename, "rb") as f:
+                        st.download_button(
+                            "⬇️ ZIP Backup İndir",
+                            f.read(),
+                            zip_filename,
+                            "application/zip"
+                        )
+                    # Geçici dosyayı temizle
+                    try:
+                        os.remove(zip_filename)
+                    except:
+                        pass
+                    st.success("✅ ZIP backup hazırlandı!")
+
             if st.button("🔄 Backup'tan Geri Yükle", use_container_width=True):
                 if os.path.exists(BACKUP_DATA_FILE) and os.path.exists(BACKUP_SCORE_FILE):
                     if st.button("⚠️ Onaylıyorum", key="confirm_restore"):
@@ -1115,6 +1502,7 @@ elif menu == "🔧 Ayarlar":
             st.write(f"📄 Paragraf dosyası: {'✅' if os.path.exists(DATA_FILE) else '❌'}")
             st.write(f"📊 Puan dosyası: {'✅' if os.path.exists(SCORE_FILE) else '❌'}")
             st.write(f"📝 Kelime dosyası: {'✅' if os.path.exists(WORDS_FILE) else '❌'}")
+            st.write(f"🔗 Eş anlamlı dosyası: {'✅' if os.path.exists(SYNONYM_FILE) else '❌'}")
             st.write(f"💾 Paragraf backup: {'✅' if os.path.exists(BACKUP_DATA_FILE) else '❌'}")
             st.write(f"💾 Puan backup: {'✅' if os.path.exists(BACKUP_SCORE_FILE) else '❌'}")
 
@@ -1129,11 +1517,42 @@ elif menu == "🔧 Ayarlar":
 
         with col1:
             st.write("**📥 Veri İçe Aktarma:**")
+            
+            # ZIP dosyası yükleme
+            uploaded_zip = st.file_uploader("ZIP Backup Yükle", type=['zip'], key="upload_zip")
+            if uploaded_zip and st.button("📦 ZIP'ten Geri Yükle", type="primary"):
+                try:
+                    with open("temp_backup.zip", "wb") as f:
+                        f.write(uploaded_zip.getvalue())
+                    
+                    if restore_from_zip("temp_backup.zip"):
+                        # Verileri yeniden yükle
+                        global paragraflar, score_data, words, synonyms
+                        paragraflar, score_data = safe_load_data()
+                        words = load_words()
+                        synonyms = load_synonyms()
+                        st.success("✅ ZIP backup'tan başarıyla geri yüklendi!")
+                        st.rerun()
+                    else:
+                        st.error("❌ ZIP'ten geri yükleme başarısız!")
+                    
+                    # Geçici dosyayı temizle
+                    try:
+                        os.remove("temp_backup.zip")
+                    except:
+                        pass
+                        
+                except Exception as e:
+                    st.error(f"❌ ZIP işleme hatası: {e}")
+
+            st.divider()
+            
             uploaded_paragraflar = st.file_uploader("Paragraflar JSON", type=['json'], key="upload_paragraflar")
             uploaded_puan = st.file_uploader("Puan JSON", type=['json'], key="upload_puan")
             uploaded_words = st.file_uploader("Kelimeler JSON", type=['json'], key="upload_words")
+            uploaded_synonyms = st.file_uploader("Eş Anlamlı JSON", type=['json'], key="upload_synonyms")
 
-            if st.button("📥 İçe Aktar", type="primary"):
+            if st.button("📥 JSON Dosyalarını İçe Aktar"):
                 try:
                     success_messages = []
 
@@ -1164,6 +1583,16 @@ elif menu == "🔧 Ayarlar":
                             success_messages.append("✅ Kelimeler içe aktarıldı!")
                         else:
                             st.error("❌ Kelimeler verisi hatalı format!")
+
+                    if uploaded_synonyms:
+                        synonyms_data = json.load(uploaded_synonyms)
+                        if isinstance(synonyms_data, list):
+                            synonyms.clear()
+                            synonyms.extend(synonyms_data)
+                            save_synonyms(synonyms)
+                            success_messages.append("✅ Eş anlamlı sorular içe aktarıldı!")
+                        else:
+                            st.error("❌ Eş anlamlı verisi hatalı format!")
 
                     if success_messages:
                         safe_save_data()
@@ -1204,12 +1633,21 @@ elif menu == "🔧 Ayarlar":
                     "application/json"
                 )
 
+            if st.button("📤 Eş Anlamlıları İndir", use_container_width=True):
+                synonyms_json = json.dumps(synonyms, ensure_ascii=False, indent=2)
+                st.download_button(
+                    "⬇️ es_anlamli.json İndir",
+                    synonyms_json,
+                    "es_anlamli_backup.json",
+                    "application/json"
+                )
+
         st.divider()
 
         st.subheader("⚠️ Tehlikeli İşlemler")
         st.warning("Bu işlemler geri alınamaz!")
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             if st.button("🗑️ Tüm Verileri Sıfırla", type="secondary"):
@@ -1226,7 +1664,8 @@ elif menu == "🔧 Ayarlar":
                         "en_to_tr_answered": 0,
                         "tr_to_en_answered": 0,
                         "fill_blank_answered": 0,
-                        "sentence_test_answered": 0
+                        "sentence_test_answered": 0,
+                        "synonym_test_answered": 0
                     })
                     if safe_save_data():
                         st.success("✅ Tüm veriler sıfırlandı!")
@@ -1241,31 +1680,45 @@ elif menu == "🔧 Ayarlar":
                         st.success("✅ Tüm paragrafların kullanılan soruları sıfırlandı!")
                         st.rerun()
 
+        with col3:
+            if st.button("🔗 Eş Anlamlıları Sıfırla", type="secondary"):
+                if st.button("⚠️ EMİNİM, VARSAYILAN!", key="confirm_reset_synonyms"):
+                    synonyms.clear()
+                    synonyms.extend(DEFAULT_SYNONYMS)
+                    if save_synonyms(synonyms):
+                        st.success("✅ Eş anlamlı sorular varsayılana döndürüldü!")
+                        st.rerun()
+
     with tab2:
         st.subheader("ℹ️ Uygulama Bilgileri")
 
-        st.write("**🔧 Versiyon:** 2.0 - Gelişmiş Sistem")
+        st.write("**🔧 Versiyon:** 3.0 - Eş Anlamlı Kelime Testleri")
         st.write("**📅 Güncelleme Tarihi:** Bugün")
 
         st.markdown("### ✨ Yeni Özellikler:")
         st.success("""
-        🆕 **v2.0 Güncellemeleri:**
+        🆕 **v3.0 Güncellemeleri:**
+        • Eş anlamlı kelime testleri (çoklu seçim)
+        • ZIP formatında backup sistemi
+        • Gelişmiş çözüm açıklamaları
+        • Cevap analizi görünümü
+        • Eş anlamlı soru ekleme arayüzü
+        • Çoklu doğru seçenek desteği
+
+        ✅ **v2.0 Özellikler:**
         • Aynı paragraftan birden fazla soru çözme
         • Cümle testleri sistemi
         • Kelime tabanlı cümle soruları
         • Kullanılan soru takip sistemi
         • Gelişmiş kelime yönetimi
-        • Cümle testi istatistikleri
 
-        ✅ **Mevcut Özellikler:**
+        📊 **Temel Özellikler:**
         • Paragraf ekleme ve listeleme
-        • 3 farklı paragraf test türü (EN→TR, TR→EN, Boşluk Doldurma)
-        • 3 farklı cümle test türü
-        • Temel puanlama sistemi
-        • Günlük ve genel istatistikler
-        • Veri yedekleme ve geri yükleme
-        • Güvenli veri kaydetme sistemi
-        • Kelime listesi yönetimi
+        • 3 farklı paragraf test türü
+        • 3 farklı cümle test türü  
+        • Eş anlamlı kelime testleri
+        • Detaylı istatistikler
+        • Güvenli veri yönetimi
         """)
 
         st.write("**🎯 Test Türleri:**")
@@ -1273,48 +1726,43 @@ elif menu == "🔧 Ayarlar":
         col1, col2 = st.columns(2)
         with col1:
             st.info("""
-            **📄 Paragraf Testleri:**
-            • **EN→TR:** İngilizce cümle veriliyor, Türkçe karşılığı bulunuyor
-            • **TR→EN:** Türkçe cümle veriliyor, İngilizce karşılığı bulunuyor  
-            • **Boşluk Doldurma:** Cümlede boş bırakılan kelime tamamlanıyor
+            **📄 Paragraf Testleri:** (1 puan)
+            • **EN→TR:** İngilizce cümle → Türkçe karşılık
+            • **TR→EN:** Türkçe cümle → İngilizce karşılık  
+            • **Boşluk Doldurma:** Eksik kelime tamamlama
 
-            *Artık aynı paragraftan birden fazla soru çözebilirsiniz!*
+            **✏️ Cümle Testleri:** (1 puan)
+            • **Cümle EN→TR:** Kelime tabanlı çeviri
+            • **Cümle TR→EN:** Kelime tabanlı çeviri
+            • **Cümle Boşluk:** Kelime seçimi
             """)
 
         with col2:
             st.info("""
-            **✏️ Cümle Testleri:**
-            • **Cümle EN→TR:** Kelimelerden oluşan cümle çevirisi
-            • **Cümle TR→EN:** Kelimelerden oluşan cümle çevirisi
-            • **Cümle Boşluk:** Kelime tabanlı boşluk doldurma
-
-            *Kelime listenizden otomatik cümle üretimi!*
+            **🔗 Eş Anlamlı Testler:** (2 puan)
+            • **Çoklu Seçim:** Birden fazla doğru seçenek
+            • **Synonym:** Eş anlamlı kelime bulma
+            • **Meaning:** Anlam kategorisi belirleme
+            • **Çözüm Açıklaması:** Detaylı açıklama
+            • **Cevap Analizi:** Seçim karşılaştırması
             """)
 
-        st.write("**🔄 Soru Sistemi:**")
+        st.write("**💾 Backup Sistemi:**")
         st.info("""
-        • **Paragraf Testleri:** Her paragraftan soruları teker teker kullanır, hepsi bittiğinde yeniden başlar
-        • **Cümle Testleri:** Kelime listenizden rastgele cümleler üretir
-        • **Akıllı Tekrar:** Aynı paragraftan sonraki soruya geçebilir veya yeni paragraf seçebilirsiniz
-        """)
-
-        st.write("**💾 Veri Güvenliği:**")
-        st.info("""
-        • Otomatik backup sistemi
-        • Hata durumunda backup'tan geri yükleme
-        • JSON formatında veri saklama
-        • Manuel veri dışa/içe aktarma imkanı
-        • Kelime listesi yönetimi
-        • Kullanılan soru takibi
+        • **ZIP Backup:** Tüm dosyaları tek dosyada
+        • **JSON Export:** Ayrı ayrı veri dışa aktarma
+        • **Otomatik Backup:** Her kayıtta otomatik
+        • **Geri Yükleme:** ZIP veya JSON'dan geri yükleme
+        • **Versiyonlama:** Backup meta bilgileri
         """)
 
         st.write("**🎮 Kullanım İpuçları:**")
         st.success("""
-        • Paragraf testlerinde "Aynı Paragraf - Sonraki Soru" ile devam edin
-        • Cümle testleri için kelime listenizi güncel tutun
-        • İstatistikler sekmesinden ilerlemenizi takip edin
-        • Düzenli backup alın
-        • Kullanılan soruları sıfırlayarak tekrar çözebilirsiniz
+        • Eş anlamlı testlerde birden fazla seçenek işaretleyin
+        • ZIP backup ile tüm verilerinizi tek dosyada saklayın  
+        • Çözüm açıklamalarını okuyarak öğrenin
+        • Cevap analizi ile hatalarınızı görün
+        • Düzenli backup almayı unutmayın
         """)
 
 # -------------------- Son --------------------
